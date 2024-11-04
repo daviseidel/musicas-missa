@@ -6,6 +6,8 @@ import (
   "os"
   "log"
   "net/http"
+  "html/template"
+
   "github.com/gofiber/fiber/v2"
   "github.com/gofiber/template/html/v2"
   "embed"
@@ -21,7 +23,7 @@ var Musicas []Musica
 //go:embed views/*
 var viewsfs embed.FS
 
-//go:embed views/css/*
+//go:embed views/static/*
 var cssfs embed.FS
 
 
@@ -29,20 +31,46 @@ var cssfs embed.FS
 func main() {
   engine := html.NewFileSystem(http.FS(viewsfs), ".html")
 
+  engine.AddFunc(
+    "unescape", func(s string) template.HTML {
+        return template.HTML(s)
+    },
+  )
+
   app := fiber.New(fiber.Config{
     Views: engine,
   })
-  app.Static("/static", "views/css") 
+
+  app.Static("/static", "views/static") 
+
   app.Get("/", func(c *fiber.Ctx) error {
       return c.Render("views/index", fiber.Map{
-          "var": "Não mascare a sua vingança com a sua justiça - Borges João",
+          "var": ".",
       }, "views/layouts/main")
   })
 
-  app.Get("/:id", func(c *fiber.Ctx) error {
-    id, err := c.ParamsInt("id")
-    fmt.Println(err)
-    return c.JSON(Musicas[id])
+  app.Get("/musicaCard", func(c *fiber.Ctx) error { 
+    id := c.QueryInt("id")
+    if id < 0 || id >= 404 {
+      return fiber.NewError(fiber.StatusServiceUnavailable, "Error: id out of range")
+    } 
+
+    return c.Render("views/partials/card", fiber.Map{
+      "titulo": Musicas[id].Titulo,
+    })
+  })
+
+  app.Get("/musica", func(c *fiber.Ctx) error {
+    id := c.QueryInt("id")
+    fmt.Println(id)
+    if id < 0 || id >= 404 {
+      return fiber.NewError(fiber.StatusServiceUnavailable, "Error: id out of range")
+    } else {
+      return c.Render("views/musica", fiber.Map{
+        "titulo": Musicas[id].Titulo,
+        "letra": Musicas[id].Letra,
+      }, "views/layouts/main")
+    }
   })
 
   readData()
