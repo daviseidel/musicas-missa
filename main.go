@@ -14,6 +14,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/template/html/v2"
+  "github.com/lithammer/fuzzysearch/fuzzy"
 )
 
 type Musica struct {
@@ -43,7 +44,8 @@ func main() {
   app := fiber.New(fiber.Config{
     Views: engine,
   })
-
+  
+  // Serve os arquvis estáticos (js, css, e o json)
   app.Static("/static", "views/static") 
 
   app.Get("/", func(c *fiber.Ctx) error {
@@ -52,6 +54,7 @@ func main() {
       }, "views/layouts/main")
   })
 
+  // /musicaCard?id
   app.Get("/musicaCard", func(c *fiber.Ctx) error { 
     id := c.QueryInt("id")
     if id < 0 || id >= 404 {
@@ -65,10 +68,11 @@ func main() {
 
   app.Get("/musica", func(c *fiber.Ctx) error {
     id := c.QueryInt("id")
+    
     if id < 0 || id >= 404 {
       return fiber.NewError(fiber.StatusServiceUnavailable, "Error: id out of range")
     } 
-
+    
     return c.Render("views/musica", fiber.Map{
       "titulo": Musicas[id].Titulo,
       "letra": Musicas[id].Letra,
@@ -78,6 +82,7 @@ func main() {
   app.Get("/musicas", func(c *fiber.Ctx) error {
     items := []string{}
     buf := new(bytes.Buffer) 
+    
     for i:=0; i < len(Musicas); i++ {
       err := c.App().Config().Views.Render(buf ,"views/partials/item", fiber.Map{
         "titulo": Musicas[i].Titulo,
@@ -87,15 +92,43 @@ func main() {
       }
       items = append(items, buf.String())
     }
-    return c.Render("views/layouts/blank", fiber.Map{
-      "data": strings.Join(items, ""), 
-    }) 
+    
+    return c.SendString(strings.Join(items, ""))
+    //return c.Render("views/layouts/blank", fiber.Map{
+    //  "data": strings.Join(items, ""), 
+    //}) 
+  })
+
+  app.Get("/search", func(c *fiber.Ctx) error {
+    searchkey := c.Query("key")
+    titulos := []string{}
+
+    for i:=0; i < len(Musicas); i++ {
+      titulos = append(titulos, Musicas[i].Titulo)
+    }
+    valid := fuzzy.Find(searchkey, titulos)
+    buffer := new(bytes.Buffer) 
+    fmt.Println(len(valid)) 
+    validBuf := []string{}
+
+    for i:=0; i < len(valid); i++ {
+      err := c.App().Config().Views.Render(buffer ,"views/partials/item", fiber.Map{
+        "titulo": valid[i],
+      }) 
+      if err != nil {
+        fmt.Println(err)
+      }
+      fmt.Println(buffer.String())
+      validBuf = append(valid, buffer.String())
+    }
+    return c.SendString(strings.Join(validBuf, ""))
   })
 
   readData()
   log.Fatal(app.Listen(":3000"))
 }
 
+// Abre o arquivo .json e leva pra memória. Deve rodar antes do app iniciar
 func readData() {
   file, err := os.Open("songs.json")
   if err != nil {
