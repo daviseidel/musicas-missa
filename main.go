@@ -1,16 +1,19 @@
 package main
 
 import (
-  "fmt"
-  "encoding/json"
-  "os"
-  "log"
-  "net/http"
-  "html/template"
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"html/template"
+	"log"
+	"net/http"
+	"os"
+	"strings"
 
-  "github.com/gofiber/fiber/v2"
-  "github.com/gofiber/template/html/v2"
-  "embed"
+	"embed"
+
+	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/template/html/v2"
 )
 
 type Musica struct {
@@ -62,15 +65,31 @@ func main() {
 
   app.Get("/musica", func(c *fiber.Ctx) error {
     id := c.QueryInt("id")
-    fmt.Println(id)
     if id < 0 || id >= 404 {
       return fiber.NewError(fiber.StatusServiceUnavailable, "Error: id out of range")
-    } else {
-      return c.Render("views/musica", fiber.Map{
-        "titulo": Musicas[id].Titulo,
-        "letra": Musicas[id].Letra,
-      }, "views/layouts/main")
+    } 
+
+    return c.Render("views/musica", fiber.Map{
+      "titulo": Musicas[id].Titulo,
+      "letra": Musicas[id].Letra,
+    }, "views/layouts/main")
+  })
+
+  app.Get("/musicas", func(c *fiber.Ctx) error {
+    items := []string{}
+    buf := new(bytes.Buffer) 
+    for i:=0; i < len(Musicas); i++ {
+      err := c.App().Config().Views.Render(buf ,"views/partials/item", fiber.Map{
+        "titulo": Musicas[i].Titulo,
+      }) 
+      if err != nil {
+        fmt.Println(err)
+      }
+      items = append(items, buf.String())
     }
+    return c.Render("views/layouts/blank", fiber.Map{
+      "data": strings.Join(items, ""), 
+    }) 
   })
 
   readData()

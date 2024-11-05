@@ -3,4 +3,9 @@
 
 <input name="id" type="number" hx-get="/musicaCard" hx-swap="afterend" hx-include="this"/>
 
+<select name="select" aria-label="Select" required>
+  <option selected disabled value="">Escolha uma Música</option>
+  <div hx-get="/musicas" hx-swap="innerHTML" hx-target="load"></div>  
+</select>
+
 
